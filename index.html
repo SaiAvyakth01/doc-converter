@@ -1,44 +1,195 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Free Document Converter</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Document Converter</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#111a2e; --text:#e8eefc; --muted:#a9b7d6;
+      --primary:#3b82f6; --danger:#ef4444; --success:#22c55e; --border:#233154;
+    }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:linear-gradient(120deg,#0b1220,#0f1b33); color:var(--text);}
+    .wrap{max-width:720px;margin:40px auto;padding:0 16px;}
+    .card{background:rgba(17,26,46,.92); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35);}
+    h1{margin:0 0 6px;font-size:22px;}
+    p{margin:0 0 16px;color:var(--muted);line-height:1.5}
+    .row{display:flex; gap:12px; flex-wrap:wrap; margin-top:12px}
+    .col{flex:1; min-width:220px}
+    label{display:block;font-size:13px;color:var(--muted); margin-bottom:6px}
+    input[type="file"], select{
+      width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      background:#0b1326; color:var(--text);
+    }
+    button{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      padding:11px 14px; border:0; border-radius:12px; background:var(--primary);
+      color:white; font-weight:600; cursor:pointer; min-width:160px;
+    }
+    button:disabled{opacity:.6; cursor:not-allowed}
+    .status{
+      margin-top:14px; padding:12px 12px; border-radius:12px; border:1px solid var(--border);
+      background:#0b1326; color:var(--text); display:none;
+    }
+    .status.info{display:block}
+    .status.success{display:block; border-color:rgba(34,197,94,.45)}
+    .status.error{display:block; border-color:rgba(239,68,68,.45)}
+    .status small{color:var(--muted)}
+    .actions{margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .spinner{
+      width:16px; height:16px; border-radius:50%;
+      border:2px solid rgba(255,255,255,.35); border-top-color:white;
+      animation:spin 1s linear infinite;
+      display:none;
+    }
+    .busy .spinner{display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hint{margin-top:10px;color:var(--muted);font-size:12px}
+    .pill{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
+  </style>
 </head>
 <body>
-  <h2>Document Converter</h2>
+  <div class="wrap">
+    <div class="card" id="card">
+      <h1>Document Converter</h1>
+      <p>Upload a document and convert it to another format.</p>
 
-  <input type="file" id="file" />
-  <br><br>
+      <div class="row">
+        <div class="col">
+          <label for="file">Select file</label>
+          <input type="file" id="file" />
+          <div class="hint">Supported (for now): <span class="pill">PDF</span> <span class="pill">DOCX</span> <span class="pill">PPTX</span></div>
+        </div>
 
-  <select id="format">
-    <option value="pdf">Convert to PDF</option>
-    <option value="docx">Convert to DOCX</option>
-    <option value="pptx">Convert to PPTX</option>
-  </select>
+        <div class="col">
+          <label for="format">Convert to</label>
+          <select id="format">
+            <option value="pdf">PDF</option>
+            <option value="docx">DOCX</option>
+            <option value="pptx">PPTX</option>
+          </select>
+          <div class="hint">Tip: Choose the output format you need.</div>
+        </div>
+      </div>
 
-  <br><br>
+      <div class="actions">
+        <button id="btn" type="button" onclick="convertFile()">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="btnText">Convert</span>
+        </button>
+        <button id="resetBtn" type="button" onclick="resetUI()" style="background:#1f2a44; min-width:120px;">
+          Reset
+        </button>
+      </div>
 
-  <button onclick="convert()">Convert</button>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </div>
+  </div>
 
-  <script>
-    async function convert() {
-      const fileInput = document.getElementById("file");
-      const format = document.getElementById("format").value;
+<script>
+  const MAX_MB = 20; // free tier safety
+  const card = document.getElementById("card");
+  const fileInput = document.getElementById("file");
+  const formatSel = document.getElementById("format");
+  const btn = document.getElementById("btn");
+  const btnText = document.getElementById("btnText");
+  const statusBox = document.getElementById("status");
 
+  function setStatus(type, title, detail="") {
+    statusBox.className = "status " + type;
+    statusBox.innerHTML = `<strong>${title}</strong>` + (detail ? `<br><small>${detail}</small>` : "");
+  }
+
+  function clearStatus() {
+    statusBox.className = "status";
+    statusBox.innerHTML = "";
+    statusBox.style.display = "none";
+  }
+
+  function showStatus() { statusBox.style.display = "block"; }
+
+  function setBusy(isBusy) {
+    if (isBusy) {
+      card.classList.add("busy");
+      btn.disabled = true;
+      btnText.textContent = "Converting...";
+    } else {
+      card.classList.remove("busy");
+      btn.disabled = false;
+      btnText.textContent = "Convert";
+    }
+  }
+
+  function resetUI(){
+    fileInput.value = "";
+    formatSel.value = "pdf";
+    clearStatus();
+    setBusy(false);
+  }
+
+  function safeName(name) {
+    return (name || "converted").replace(/[^\w.\- ]+/g, "_");
+  }
+
+  async function convertFile() {
+    clearStatus();
+
+    const file = fileInput.files[0];
+    const format = formatSel.value;
+
+    if (!file) {
+      showStatus();
+      setStatus("error", "No file selected", "Please select a PDF, DOCX, or PPTX file first.");
+      return;
+    }
+
+    const sizeMb = file.size / (1024*1024);
+    if (sizeMb > MAX_MB) {
+      showStatus();
+      setStatus("error", "File too large", `Please upload a file smaller than ${MAX_MB} MB. Current: ${sizeMb.toFixed(1)} MB`);
+      return;
+    }
+
+    setBusy(true);
+    showStatus();
+    setStatus("info", "Working on it…", "Uploading file and preparing your download.");
+
+    try {
       const data = new FormData();
-      data.append("file", fileInput.files[0]);
+      data.append("file", file);
       data.append("format", format);
 
-      const response = await fetch("/convert", {
-        method: "POST",
-        body: data
-      });
+      const res = await fetch("/convert", { method: "POST", body: data });
 
-      const blob = await response.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "converted." + format;
-      link.click();
+      // Handle server error text cleanly
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        throw new Error(msg || `Server returned ${res.status}`);
+      }
+
+      const blob = await res.blob();
+
+      // Try to honor filename from server (Content-Disposition)
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename="?([^"]+)"?/i.exec(cd);
+      const outName = match?.[1] || (safeName(file.name).replace(/\.[^.]+$/, "") + "." + format);
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = outName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setStatus("success", "Conversion completed ✅", `Your file "${outName}" is ready and has started downloading.`);
+    } catch (err) {
+      setStatus("error", "Conversion failed", err.message || "Please try again.");
+    } finally {
+      setBusy(false);
     }
-  </script>
+  }
+</script>
 </body>
 </html>
