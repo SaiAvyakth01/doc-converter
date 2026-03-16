@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Free Document Converter</title>
+</head>
+<body>
+  <h2>Document Converter</h2>
+
+  <input type="file" id="file" />
+  <br><br>
+
+  <select id="format">
+    <option value="pdf">Convert to PDF</option>
+    <option value="docx">Convert to DOCX</option>
+    <option value="pptx">Convert to PPTX</option>
+  </select>
+
+  <br><br>
+
+  <button onclick="convert()">Convert</button>
+
+  <script>
+    async function convert() {
+      const fileInput = document.getElementById("file");
+      const format = document.getElementById("format").value;
+
+      const data = new FormData();
+      data.append("file", fileInput.files[0]);
+      data.append("format", format);
+
+      const response = await fetch("/convert", {
+        method: "POST",
+        body: data
+      });
+
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "converted." + format;
+      link.click();
+    }
+  </script>
+</body>
+</html>
