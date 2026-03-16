@@ -1,301 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Document Converter</title>
-  <style>
-    :root{
-      --bg:#0b1220; --card:#111a2e; --text:#e8eefc; --muted:#a9b7d6;
-      --primary:#3b82f6; --danger:#ef4444; --success:#22c55e; --border:#233154;
-    }
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:linear-gradient(120deg,#0b1220,#0f1b33); color:var(--text);}
-    .wrap{max-width:720px;margin:40px auto;padding:0 16px;}
-    .card{background:rgba(17,26,46,.92); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35);}
-    h1{margin:0 0 6px;font-size:22px;}
-    p{margin:0 0 16px;color:var(--muted);line-height:1.5}
-    .row{display:flex; gap:12px; flex-wrap:wrap; margin-top:12px}
-    .col{flex:1; min-width:220px}
-    label{display:block;font-size:13px;color:var(--muted); margin-bottom:6px}
-    input[type="file"], select{
-      width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
-      background:#0b1326; color:var(--text);
-    }
-    button{
-      display:inline-flex; align-items:center; justify-content:center; gap:10px;
-      padding:11px 14px; border:0; border-radius:12px; background:var(--primary);
-      color:white; font-weight:600; cursor:pointer; min-width:160px;
-    }
-    button:disabled{opacity:.6; cursor:not-allowed}
-    .status{
-      margin-top:14px; padding:12px 12px; border-radius:12px; border:1px solid var(--border);
-      background:#0b1326; color:var(--text); display:none;
-    }
-    .status.info{display:block}
-    .status.success{display:block; border-color:rgba(34,197,94,.45)}
-    .status.error{display:block; border-color:rgba(239,68,68,.45)}
-    .status small{color:var(--muted)}
-    .actions{margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center}
-    .spinner{
-      width:16px; height:16px; border-radius:50%;
-      border:2px solid rgba(255,255,255,.35); border-top-color:white;
-      animation:spin 1s linear infinite;
-      display:none;
-    }
-    .busy .spinner{display:inline-block}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .hint{margin-top:10px;color:var(--muted);font-size:12px}
-    .pill{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
-    .pill.green{border-color: rgba(34,197,94,.45); color:#bff3d1}
-  </style>
+  <title>Free Document Converter</title>
+  <meta charset="UTF-8">
 </head>
+<body style="font-family: Arial; padding: 30px;">
 
-<body>
-  <div class="wrap">
-    <div class="card" id="card">
-      <h1>Document Converter</h1>
-      <p>
-        Upload a document and convert it to another format.
-        <br><small style="color:#a9b7d6;">
-          PDF → PPTX runs locally in your browser (no upload).
-        </small>
-      </p>
+  <h2>Free Document Converter</h2>
+  <p>Convert PDF, DOCX, PPTX files easily</p>
 
-      <div class="row">
-        <div class="col">
-          <label for="file">Select file</label>
-          <input type="file" id="file" />
-          <div class="hint">
-            Supported:
-            <span class="pill green">PDF→PPTX (Browser)</span>
-            <span class="pill">PDF</span>
-            <span class="pill">DOCX</span>
-            <span class="pill">PPTX</span>
-          </div>
-        </div>
+  <input type="file" id="file" />
+  <br><br>
 
-        <div class="col">
-          <label for="format">Convert to</label>
-          <select id="format">
-            <option value="pdf">PDF</option>
-            <option value="docx">DOCX</option>
-            <option value="pptx">PPTX</option>
-          </select>
-          <div class="hint">Tip: Choose the output format you need.</div>
-        </div>
-      </div>
+  <label>Select output format:</label><br>
+  <select id="format">
+    <option value="pdf">PDF</option>
+    <option value="docx">DOCX</option>
+    <option value="pptx">PPTX</option>
+  </select>
 
-      <div class="actions">
-        <button id="btn" type="button" onclick="convertFile()">
-          <span class="spinner" aria-hidden="true"></span>
-          <span id="btnText">Convert</span>
-        </button>
-        <button id="resetBtn" type="button" onclick="resetUI()" style="background:#1f2a44; min-width:120px;">
-          Reset
-        </button>
-      </div>
+  <br><br>
 
-      <div id="status" class="status" role="status" aria-live="polite"></div>
-    </div>
-  </div>
+  <button onclick="convert()">Convert</button>
 
-  <!-- 1) PDF.js (render PDF pages to canvas) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js"></script>
+  <p id="status"></p>
+
   <script>
-    // PDF.js uses a worker; this must be set before rendering pages. [3](https://bing.com/search?q=Cloudflare+Pages+create+project+from+GitHub+repository)
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.js";
-  </script>
+    async function convert() {
+      const fileInput = document.getElementById("file");
+      const format = document.getElementById("format").value;
+      const status = document.getElementById("status");
 
-  <!-- 2) PptxGenJS (create PPTX in browser) -->
-  <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs/dist/pptxgen.bundle.js"></script>
-
-  <!-- 3) App logic -->
-  <script>
-    const MAX_MB = 20; // safety limit
-    const card = document.getElementById("card");
-    const fileInput = document.getElementById("file");
-    const formatSel = document.getElementById("format");
-    const btn = document.getElementById("btn");
-    const btnText = document.getElementById("btnText");
-    const statusBox = document.getElementById("status");
-
-    function setStatus(type, title, detail="") {
-      statusBox.className = "status " + type;
-      statusBox.innerHTML =
-        `<strong>${title}</strong>` + (detail ? `<br><small>${detail}</small>` : "");
-      statusBox.style.display = "block";
-    }
-
-    function clearStatus() {
-      statusBox.className = "status";
-      statusBox.innerHTML = "";
-      statusBox.style.display = "none";
-    }
-
-    function setBusy(isBusy) {
-      if (isBusy) {
-        card.classList.add("busy");
-        btn.disabled = true;
-        btnText.textContent = "Converting...";
-      } else {
-        card.classList.remove("busy");
-        btn.disabled = false;
-        btnText.textContent = "Convert";
-      }
-    }
-
-    function resetUI(){
-      fileInput.value = "";
-      formatSel.value = "pdf";
-      clearStatus();
-      setBusy(false);
-    }
-
-    function safeName(name) {
-      return (name || "converted").replace(/[^\w.\- ]+/g, "_");
-    }
-
-    // ====== Browser-only PDF -> PPTX (PDF pages -> canvas -> images -> slides) ======
-    // This follows the common in-browser strategy used by PDF→PPTX tools:
-    // render each PDF page via pdfjs-dist, convert to JPEG data URL, place on a slide in PptxGenJS. [1](https://dev.azure.com/mseng/b924d696-3eae-4116-8443-9a18392d8544/_workitems/edit/2359653)[2](https://microsoft.sharepoint.com/teams/ODSPMeTA/Shared%20Documents/General/Analysis%20Team%20-%20Projects/visamp/FHL%20202603/learn_nodejs/chapter-05-serving-static-files/public/index.html?web=1)[3](https://bing.com/search?q=Cloudflare+Pages+create+project+from+GitHub+repository)[4](https://yureiblog.com/dev/cloudflare/cloudflare_pages_full_setup)[5](https://opennext.js.org/cloudflare/troubleshooting)
-    async function convertPdfToPptxInBrowser(pdfFile) {
-      const pptx = new PptxGenJS();
-      pptx.layout = "LAYOUT_WIDE"; // 13.333 x 7.5 inches (16:9)
-
-      // Slide size in inches for LAYOUT_WIDE
-      const SLIDE_W = 13.333;
-      const SLIDE_H = 7.5;
-
-      const pdfBytes = await pdfFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise; // PDF.js promise usage [3](https://bing.com/search?q=Cloudflare+Pages+create+project+from+GitHub+repository)
-
-      const total = pdf.numPages;
-
-      for (let i = 1; i <= total; i++) {
-        setStatus("info", "Converting PDF → PPTX…", `Processing page ${i} of ${total}`);
-
-        const page = await pdf.getPage(i);
-
-        // Render scale (2 = sharp, higher = heavier)
-        const scale = 2.0;
-        const viewport = page.getViewport({ scale });
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-
-        await page.render({ canvasContext: ctx, viewport }).promise; // render() pipeline [3](https://bing.com/search?q=Cloudflare+Pages+create+project+from+GitHub+repository)
-
-        // Export as JPEG data URL (good size/quality balance)
-        const imgData = canvas.toDataURL("image/jpeg", 0.92);
-
-        // Fit image on slide without stretching (contain)
-        const imgWpx = canvas.width;
-        const imgHpx = canvas.height;
-        const imgRatio = imgWpx / imgHpx;
-        const slideRatio = SLIDE_W / SLIDE_H;
-
-        let w = SLIDE_W, h = SLIDE_H, x = 0, y = 0;
-        if (imgRatio > slideRatio) {
-          // image wider -> fit width
-          w = SLIDE_W;
-          h = w / imgRatio;
-          y = (SLIDE_H - h) / 2;
-        } else {
-          // image taller -> fit height
-          h = SLIDE_H;
-          w = h * imgRatio;
-          x = (SLIDE_W - w) / 2;
-        }
-
-        const slide = pptx.addSlide();
-        // PptxGenJS supports images using base64 data URLs. [4](https://yureiblog.com/dev/cloudflare/cloudflare_pages_full_setup)
-        slide.addImage({ data: imgData, x, y, w, h });
-
-        // free memory
-        canvas.width = 0;
-        canvas.height = 0;
-      }
-
-      const base = safeName(pdfFile.name).replace(/\.[^.]+$/, "");
-      const outName = `${base}.pptx`;
-
-      // Browser export supported by PptxGenJS (writeFile). lare/troubleshooting)[6](https://portal.microsofticm.com/imp/v3/incidents/details/758446712)
-      await pptx.writeFile({ fileName: outName });
-      return outName;
-    }
-
-    // ====== Main Convert button handler ======
-    async function convertFile() {
-      clearStatus();
-
-      const file = fileInput.files[0];
-      const format = formatSel.value;
-
-      if (!file) {
-        setStatus("error", "No file selected", "Please select a PDF, DOCX, or PPTX file first.");
+      if (!fileInput.files.length) {
+        alert("Please select a file");
         return;
       }
 
-      const sizeMb = file.size / (1024*1024);
-      if (sizeMb > MAX_MB) {
-        setStatus("error", "File too large",
-          `Please upload a file smaller than ${MAX_MB} MB. Current: ${sizeMb.toFixed(1)} MB`);
-        return;
-      }
+      status.innerText = "Uploading & converting...";
 
-      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      formData.append("format", format);
 
-      setBusy(true);
+      const response = await fetch("/convert", {
+        method: "POST",
+        body: formData
+      });
 
-      try {
-        // ✅ Browser-only PDF -> PPTX
-        if (ext === "pdf" && format === "pptx") {
-          setStatus("info", "Working on it…", "Converting PDF to PPTX locally in your browser (no upload).");
-          const outName = await convertPdfToPptxInBrowser(file);
-          setStatus("success", "Conversion completed ✅", `Downloaded: "${outName}"`);
-          return;
-        }
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "converted." + format;
+      link.click();
 
-        // For other pairs, use your existing backend endpoint /convert
-        setStatus("info", "Working on it…", "Uploading file and preparing your download.");
-
-        const data = new FormData();
-        data.append("file", file);
-        data.append("format", format);
-
-        const res = await fetch("/convert", { method: "POST", body: data });
-
-        if (!res.ok) {
-          const msg = await res.text().catch(() => "");
-          throw new Error(msg || `Server returned ${res.status}`);
-        }
-
-        const blob = await res.blob();
-
-        const cd = res.headers.get("Content-Disposition") || "";
-        const match = /filename="?([^"]+)"?/i.exec(cd);
-        const outName = match?.[1] || (safeName(file.name).replace(/\.[^.]+$/, "") + "." + format);
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = outName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-
-        setStatus("success", "Conversion completed ✅", `Your file "${outName}" is ready and has started downloading.`);
-      } catch (err) {
-        setStatus("error", "Conversion failed", err?.message || "Please try again.");
-      } finally {
-        setBusy(false);
-      }
+      status.innerText = "Conversion complete ✅";
     }
   </script>
+
 </body>
 </html>
