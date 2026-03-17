@@ -2,186 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ConvertHub — Web Converter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Doc Converter</title>
 
-  <!-- Tailwind Play CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> <!--  -->
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
   <!-- pdf-lib -->
-  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script> <!-- [3](https://sentry.io/answers/how-do-i-resolve-cannot-find-module-error-using-node-js/) -->
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
-  <!-- fflate (ZIP in browser) -->
-  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script> <!-- [6](https://github.com/elwerene/libreoffice-convert/issues/97)[7](https://outlook.office365.com/owa/?ItemID=AAMkAGQ4NmIwMTljLTlmMDktNDgyMS1hOTA0LTUyMDY3YTIzM2NiMwBGAAAAAACzHEGInO7iR5JsH9%2b6BmmJBwDb9ROgopMBTo%2bhkPJncQOtAAAAAAEMAADb9ROgopMBTo%2bhkPJncQOtAAByjiyhAAA%3d&exvsurl=1&viewmodel=ReadMessageItem) -->
+  <!-- fflate (ZIP support) -->
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+
+  <!-- Your JS (MUST be defer) -->
+  <script src="./app.js" defer></script>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100">
-  <div class="mx-auto max-w-6xl px-4 py-10">
-    <header class="flex flex-col gap-2">
-      <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
-        ConvertHub <span class="text-indigo-300">— Web Converter</span>
-      </h1>
-      <p class="text-slate-300">Private • Fast • Runs fully in your browser • Hosted on Cloudflare Pages</p>
-    </header>
+<body class="bg-slate-900 text-white min-h-screen p-6">
 
-    <main class="mt-8 rounded-2xl bg-white/5 border border-white/10 shadow-xl overflow-hidden">
-      <div class="p-5 md:p-6 border-b border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h2 class="text-xl font-semibold">Converter Tools</h2>
-          <p class="text-slate-300 text-sm">PDF tools + Image tools. Download results instantly.</p>
-        </div>
+  <h1 class="text-3xl font-bold mb-4">Doc Converter</h1>
 
-        <div class="flex flex-wrap gap-2">
-          <button class="tabbtn px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 font-semibold" data-tab="pdf">PDF Tools</button>
-          <button class="tabbtn px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 font-semibold" data-tab="image">Image Tools</button>
-        </div>
-      </div>
-
-      <div class="p-5 md:p-6 grid gap-6">
-
-        <!-- Dropzone -->
-        <section id="dropzone"
-          class="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-center transition">
-          <p class="text-lg font-semibold">Drop files here</p>
-          <p class="text-slate-300 text-sm mt-1">or</p>
-
-          <div class="mt-4 flex flex-col md:flex-row gap-2 justify-center items-center">
-            <label class="inline-flex cursor-pointer items-center justify-center rounded-xl bg-indigo-500 hover:bg-indigo-400 px-5 py-2 font-semibold">
-              Select files
-              <input id="fileInput" type="file" class="hidden" multiple>
-            </label>
-
-            <button id="clearBtn" class="rounded-xl bg-white/10 hover:bg-white/15 px-5 py-2 font-semibold">
-              Clear
-            </button>
-          </div>
-
-          <p class="text-xs text-slate-400 mt-3" id="hintText">
-            Tip: Select PDFs for PDF tools or Images (JPG/PNG/WEBP) for image tools.
-          </p>
-        </section>
-
-        <!-- Selected files -->
-        <section class="rounded-2xl bg-black/20 border border-white/10 p-4">
-          <div class="flex items-center justify-between">
-            <h3 class="font-semibold">Selected files</h3>
-            <span id="fileCount" class="text-xs px-2 py-1 rounded-lg bg-white/10">0</span>
-          </div>
-          <ul id="fileList" class="mt-3 grid gap-2 text-sm"></ul>
-        </section>
-
-        <!-- PDF Panel -->
-        <section id="panel-pdf" class="panel grid gap-4">
-          <div class="grid md:grid-cols-2 gap-4">
-
-            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <h4 class="font-semibold">Merge PDFs</h4>
-              <p class="text-slate-300 text-sm">Combine multiple PDFs into one.</p>
-              <button id="btnMerge" class="mt-3 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Merge & Download
-              </button>
-            </div>
-
-            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <h4 class="font-semibold">Split / Extract pages</h4>
-              <p class="text-slate-300 text-sm">Range examples: <code>1-3,5,9-10</code> • <code>all</code> • <code>odd</code> • <code>even</code></p>
-              <input id="pageRange" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 outline-none"
-                     placeholder="Enter range (e.g. 1-3,5) or all/odd/even">
-              <div class="mt-3 grid grid-cols-2 gap-2">
-                <button id="btnExtractOne" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                  Extract as ONE PDF
-                </button>
-                <button id="btnSplitZip" class="rounded-xl bg-indigo-500 hover:bg-indigo-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                  Split to ZIP (pages)
-                </button>
-              </div>
-            </div>
-
-            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <h4 class="font-semibold">Delete pages</h4>
-              <p class="text-slate-300 text-sm">Deletes pages in range and downloads updated PDF.</p>
-              <button id="btnDelete" class="mt-3 w-full rounded-xl bg-rose-500 hover:bg-rose-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Delete & Download
-              </button>
-            </div>
-
-            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <h4 class="font-semibold">Rotate pages</h4>
-              <p class="text-slate-300 text-sm">Rotate all pages or only the range you entered.</p>
-              <div class="mt-3 flex gap-2">
-                <select id="rotateDeg" class="w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 outline-none">
-                  <option value="90">90°</option>
-                  <option value="180">180°</option>
-                  <option value="270">270°</option>
-                </select>
-              </div>
-              <button id="btnRotate" class="mt-3 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Rotate & Download
-              </button>
-            </div>
-
-          </div>
-        </section>
-
-        <!-- Image Panel -->
-        <section id="panel-image" class="panel hidden grid gap-4">
-          <div class="grid md:grid-cols-2 gap-4">
-
-            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <h4 class="font-semibold">Images → PDF</h4>
-              <p class="text-slate-300 text-sm">Combine images into one PDF (A4 pages).</p>
-              <button id="btnImgToPdf" class="mt-3 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Create PDF
-              </button>
-            </div>
-
-            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <h4 class="font-semibold">Image format convert (ZIP)</h4>
-              <p class="text-slate-300 text-sm">Convert images → PNG/JPG/WEBP and download one ZIP.</p>
-
-              <select id="imgFormat" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 outline-none">
-                <option value="image/png">PNG</option>
-                <option value="image/jpeg">JPG</option>
-                <option value="image/webp">WEBP</option>
-              </select>
-
-              <div class="mt-3">
-                <label class="text-xs text-slate-300">Quality (JPG/WEBP only)</label>
-                <input id="imgQuality" type="range" min="40" max="95" value="90" class="w-full">
-                <div class="text-xs text-slate-400">Tip: Lower = smaller size.</div>
-              </div>
-
-              <button id="btnImgConvertZip" class="mt-3 w-full rounded-xl bg-indigo-500 hover:bg-indigo-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Convert & Download ZIP
-              </button>
-            </div>
-
-          </div>
-        </section>
-
-        <!-- Status -->
-        <section class="rounded-2xl bg-black/20 border border-white/10 p-4">
-          <div class="flex items-center justify-between">
-            <p class="font-semibold">Status</p>
-            <span id="badge" class="text-xs px-2 py-1 rounded-lg bg-white/10">Idle</span>
-          </div>
-          <div class="mt-3 flex items-center gap-3">
-            <div id="spinner" class="hidden h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
-            <p id="status" class="text-slate-300 text-sm">Drop files to begin.</p>
-          </div>
-        </section>
-
-        <!-- Toasts -->
-        <div id="toastWrap" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
-
-      </div>
-    </main>
-
-    <footer class="mt-6 text-center text-xs text-slate-400">
-      Deployed via GitHub → Cloudflare Pages. PDF processing uses pdf-lib, ZIP uses fflate. [1](https://microsoft.sharepoint.com/teams/aitagentbuilders/SitePages/AI%20Toolkit%20-%20Build%20Your%20own%20agents.aspx?web=1)[3](https://sentry.io/answers/how-do-i-resolve-cannot-find-module-error-using-node-js/)[6](https://github.com/elwerene/libreoffice-convert/issues/97)
-    </footer>
+  <!-- Status -->
+  <div id="libStatus" class="mb-4 p-3 rounded bg-slate-800 text-sm">
+    Loading libraries...
   </div>
 
-  <script src="./app.js"></script>
+  <!-- File input -->
+  <input id="fileInput" type="file" multiple class="mb-4 block">
+
+  <!-- Buttons -->
+  <div class="grid grid-cols-2 gap-3 max-w-md">
+    <button id="btnMerge" class="bg-green-600 p-2 rounded">Merge PDFs</button>
+    <button id="btnSplit" class="bg-blue-600 p-2 rounded">Split PDF</button>
+    <button id="btnRotate" class="bg-yellow-600 p-2 rounded">Rotate PDF</button>
+    <button id="btnDelete" class="bg-red-600 p-2 rounded">Delete Pages</button>
+    <button id="btnImgToPdf" class="bg-purple-600 p-2 rounded">Images → PDF</button>
+    <button id="btnImgZip" class="bg-indigo-600 p-2 rounded">Images → ZIP</button>
+  </div>
+
 </body>
 </html>
