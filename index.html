@@ -3,113 +3,163 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ConvertHub — Browser PDF Tools</title>
+  <title>ConvertHub — Browser Converter</title>
 
-  <!-- Tailwind Play CDN (dev/prototype friendly) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> <!-- [8](https://tailwindcss.com/docs/installation/play-cdn) -->
+  <!-- Tailwind Play CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> <!-- [5](https://tailwindcss.com/docs/installation/play-cdn) -->
 
-  <!-- pdf-lib (browser) -->
-  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script> <!-- [4](https://pdf-lib.js.org/) -->
+  <!-- pdf-lib -->
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script> <!-- [3](https://pdf-lib.js.org/) -->
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100">
-  <div class="mx-auto max-w-5xl px-4 py-10">
+  <div class="mx-auto max-w-6xl px-4 py-10">
+
+    <!-- Header -->
     <header class="flex flex-col gap-2">
       <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
-        ConvertHub <span class="text-indigo-300">— PDF Tools</span>
+        ConvertHub <span class="text-indigo-300">— Browser Converter</span>
       </h1>
       <p class="text-slate-300">
-        100% browser-based • files never leave your device • hosted on Cloudflare Pages
+        Fast • private • 100% in-browser • hosted on Cloudflare Pages
       </p>
     </header>
 
-    <main class="mt-8 grid gap-6">
-      <!-- Card -->
-      <section class="rounded-2xl bg-white/5 border border-white/10 shadow-xl">
-        <div class="p-5 md:p-6 border-b border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 class="text-xl font-semibold">Choose a tool</h2>
-            <p class="text-slate-300 text-sm">Merge, split, reorder, rotate — clean and fast.</p>
-          </div>
-          <div class="flex gap-2">
-            <button class="tooltab px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold" data-tab="merge">Merge</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="split">Split</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="reorder">Reorder</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="rotate">Rotate</button>
-          </div>
+    <!-- Main Card -->
+    <main class="mt-8 rounded-2xl bg-white/5 border border-white/10 shadow-xl overflow-hidden">
+      <div class="p-5 md:p-6 border-b border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h2 class="text-xl font-semibold">Tools</h2>
+          <p class="text-slate-300 text-sm">PDF + Image conversions (no uploads).</p>
         </div>
 
-        <div class="p-5 md:p-6">
-          <!-- Drop Zone -->
-          <div id="dropzone" class="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-8 text-center transition">
-            <p class="text-lg font-semibold">Drop PDF(s) here</p>
-            <p class="text-slate-300 text-sm mt-1">or</p>
-            <label class="inline-flex mt-4 cursor-pointer items-center justify-center rounded-xl bg-indigo-500 hover:bg-indigo-400 px-5 py-2 font-semibold">
+        <!-- Tabs -->
+        <div class="flex flex-wrap gap-2">
+          <button class="tabbtn px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 font-semibold" data-tab="pdf">PDF</button>
+          <button class="tabbtn px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 font-semibold" data-tab="image">Image</button>
+        </div>
+      </div>
+
+      <div class="p-5 md:p-6 grid gap-6">
+
+        <!-- Dropzone -->
+        <section class="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-center" id="dropzone">
+          <p class="text-lg font-semibold">Drop files here</p>
+          <p class="text-slate-300 text-sm mt-1">or</p>
+
+          <div class="mt-4 flex flex-col md:flex-row gap-2 justify-center items-center">
+            <label class="inline-flex cursor-pointer items-center justify-center rounded-xl bg-indigo-500 hover:bg-indigo-400 px-5 py-2 font-semibold">
               Select files
-              <input id="fileInput" type="file" accept="application/pdf" multiple class="hidden">
+              <input id="fileInput" type="file" class="hidden" multiple />
             </label>
-            <p class="text-xs text-slate-400 mt-3">Tip: Works best in Chrome/Edge.</p>
+
+            <button id="clearBtn" class="rounded-xl bg-white/10 hover:bg-white/15 px-5 py-2 font-semibold">
+              Clear
+            </button>
           </div>
 
-          <!-- Tool Panels -->
-          <div class="mt-6 grid gap-5">
-            <div id="panel-merge" class="panel">
-              <h3 class="font-semibold text-lg">Merge PDFs</h3>
+          <p class="text-xs text-slate-400 mt-3">
+            Tip: PDFs for PDF tools • Images (JPG/PNG/WebP) for Image tools
+          </p>
+        </section>
+
+        <!-- Selected Files -->
+        <section class="rounded-2xl bg-black/20 border border-white/10 p-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold">Selected files</h3>
+            <span id="fileCount" class="text-xs px-2 py-1 rounded-lg bg-white/10">0</span>
+          </div>
+          <ul id="fileList" class="mt-3 grid gap-2 text-sm"></ul>
+        </section>
+
+        <!-- PDF Panel -->
+        <section id="panel-pdf" class="panel grid gap-4">
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <h4 class="font-semibold">Merge PDFs</h4>
               <p class="text-slate-300 text-sm">Combine multiple PDFs into one.</p>
-              <button id="btnMerge" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold">
+              <button id="btnMerge" class="mt-3 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                 Merge & Download
               </button>
             </div>
 
-            <div id="panel-split" class="panel hidden">
-              <h3 class="font-semibold text-lg">Split PDF</h3>
-              <p class="text-slate-300 text-sm">Extract pages (example: 1-3, 5, 9-10).</p>
-              <input id="splitRange" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none"
-                     placeholder="Page ranges e.g. 1-3,5,9-10">
-              <button id="btnSplit" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold">
-                Split & Download ZIP
-              </button>
-            </div>
-
-            <div id="panel-reorder" class="panel hidden">
-              <h3 class="font-semibold text-lg">Reorder / Delete Pages</h3>
-              <p class="text-slate-300 text-sm">Give page order like: 3,1,2,5 (missing pages are deleted).</p>
-              <input id="reorderList" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none"
-                     placeholder="Order e.g. 3,1,2,5">
-              <button id="btnReorder" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold">
-                Rebuild & Download
-              </button>
-            </div>
-
-            <div id="panel-rotate" class="panel hidden">
-              <h3 class="font-semibold text-lg">Rotate Pages</h3>
-              <p class="text-slate-300 text-sm">Rotate all pages by 90/180/270 degrees.</p>
-              <select id="rotateDeg" class="mt-3 w-full md:w-64 rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none">
-                <option value="90">90°</option>
-                <option value="180">180°</option>
-                <option value="270">270°</option>
-              </select>
-              <button id="btnRotate" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold">
-                Rotate & Download
-              </button>
-            </div>
-
-            <!-- Status -->
-            <div class="rounded-xl bg-black/20 border border-white/10 p-4">
-              <div class="flex items-center justify-between">
-                <p class="font-semibold">Status</p>
-                <span id="badge" class="text-xs px-2 py-1 rounded-lg bg-white/10">Idle</span>
+            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <h4 class="font-semibold">Split / Extract pages</h4>
+              <p class="text-slate-300 text-sm">Example: <code>1-3,5,9-10</code></p>
+              <input id="pageRange" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 outline-none"
+                     placeholder="Page ranges e.g. 1-3,5">
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <button id="btnExtract" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                  Extract as PDF
+                </button>
+                <button id="btnDelete" class="rounded-xl bg-rose-500 hover:bg-rose-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                  Delete pages
+                </button>
               </div>
-              <p id="status" class="text-slate-300 text-sm mt-2">Upload files to begin.</p>
+            </div>
+
+            <div class="rounded-2xl bg-white/5 border border-white/10 p-4 md:col-span-2">
+              <h4 class="font-semibold">Rotate pages</h4>
+              <p class="text-slate-300 text-sm">Rotate all pages by 90/180/270 degrees.</p>
+              <div class="mt-3 flex flex-col md:flex-row gap-2">
+                <select id="rotateDeg" class="w-full md:w-56 rounded-xl bg-black/20 border border-white/10 px-3 py-2 outline-none">
+                  <option value="90">90°</option>
+                  <option value="180">180°</option>
+                  <option value="270">270°</option>
+                </select>
+                <button id="btnRotate" class="w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                  Rotate & Download
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <footer class="text-xs text-slate-400 text-center">
-        Built with Cloudflare Pages + GitHub • Browser-only PDF processing using pdf-lib.
-      </footer>
+        <!-- Image Panel -->
+        <section id="panel-image" class="panel hidden grid gap-4">
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <h4 class="font-semibold">Images → PDF</h4>
+              <p class="text-slate-300 text-sm">Combine selected images into one PDF.</p>
+              <button id="btnImgToPdf" class="mt-3 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                Create PDF
+              </button>
+            </div>
+
+            <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <h4 class="font-semibold">Image format convert</h4>
+              <p class="text-slate-300 text-sm">Convert selected images to PNG/JPG/WebP.</p>
+              <select id="imgFormat" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-3 py-2 outline-none">
+                <option value="image/png">PNG</option>
+                <option value="image/jpeg">JPG</option>
+                <option value="image/webp">WEBP</option>
+              </select>
+              <button id="btnImgConvert" class="mt-3 w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                Convert & Download
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Status + Toast area -->
+        <section class="rounded-2xl bg-black/20 border border-white/10 p-4">
+          <div class="flex items-center justify-between">
+            <p class="font-semibold">Status</p>
+            <span id="badge" class="text-xs px-2 py-1 rounded-lg bg-white/10">Idle</span>
+          </div>
+          <div class="mt-3 flex items-center gap-3">
+            <div id="spinner" class="hidden h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
+            <p id="status" class="text-slate-300 text-sm">Drop files to begin.</p>
+          </div>
+        </section>
+
+        <div id="toastWrap" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
+      </div>
     </main>
+
+    <footer class="mt-6 text-center text-xs text-slate-400">
+      Built on Cloudflare Pages + GitHub • PDF ops powered by pdf-lib. [1](https://vercel.com/docs/plans/hobby)[3](https://pdf-lib.js.org/)
+    </footer>
   </div>
 
   <script src="./app.js"></script>
