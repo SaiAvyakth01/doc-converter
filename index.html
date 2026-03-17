@@ -1,170 +1,146 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ConvertHub — Browser PDF Tools</title>
+  <title>ConvertHub — Browser Converter</title>
 
-  <!-- Tailwind Play CDN -->
-  https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4script> [3](https://learn.microsoft.com/en-us/aspnet/core/blazor/javascript-interoperability/import-export-interop?view=aspnetcore-10.0)
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0b1220" />
 
-  <!-- pdf-lib (browser) -->
-  https://unpkg.com/pdf-lib/dist/pdf-lib.min.jsscript> [4](https://sentry.io/answers/how-do-i-resolve-cannot-find-module-error-using-node-js/)
-
-  <!-- fflate (ZIP in browser) -->
-  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>ub.com/elwerene/libreoffice-convert/issues/97)[6](https://outlook.office365.com/owa/?ItemID=AAMkAGQ4NmIwMTljLTlmMDktNDgyMS1hOTA0LTUyMDY3YTIzM2NiMwBGAAAAAACzHEGInO7iR5JsH9%2b6BmmJBwDb9ROgopMBTo%2bhkPJncQOtAAAAAAEMAADb9ROgopMBTo%2bhkPJncQOtAAByjiyhAAA%3d&exvsurl=1&viewmodel=ReadMessageItem)
-
-  <!-- Your app (defer = loads after HTML so buttons always bind) -->
-  <script src="./app.js" defer></script>
+  <!-- pdf-lib (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script defer src="./app.js"></script>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100">
-  <div class="mx-auto max-w-5xl px-4 py-10">
-    <header class="flex flex-col gap-2">
-      <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
-        ConvertHub <span class="text-indigo-300">— PDF Tools</span>
-      </h1>
-      <p class="text-slate-300">
-        100% browser-based • files never leave your device • hosted on Cloudflare Pages
-      </p>
-    </header>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="title">
+        <span class="t1">ConvertHub</span>
+        <span class="t2">— Browser Converter</span>
+      </div>
+      <div class="subtitle">Fast • private • 100% in-browser • hosted on Cloudflare Pages</div>
+    </div>
+  </header>
 
-    <main class="mt-8 grid gap-6">
-      <section class="rounded-2xl bg-white/5 border border-white/10 shadow-xl">
-        <div class="p-5 md:p-6 border-b border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 class="text-xl font-semibold">Choose a tool</h2>
-            <p class="text-slate-300 text-sm">Merge, split, delete, rotate — plus image conversions.</p>
-          </div>
-          <div class="flex gap-2 flex-wrap">
-            <button class="tooltab px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold" data-tab="merge">Merge</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="extract">Extract</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="split">Split</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="delete">Delete</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="rotate">Rotate</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="img2pdf">Images→PDF</button>
-            <button class="tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100" data-tab="imgconvert">Image Convert</button>
-          </div>
+  <main class="wrap">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Tools</div>
+          <div class="panel-sub">PDF + Image conversions (no uploads).</div>
         </div>
 
-        <div class="p-5 md:p-6">
-          <!-- Drop Zone -->
-          <div id="dropzone" class="rounded-2xl border-2 border-dashed border-white/20 bg-white/5 p-8 text-center transition">
-            <p class="text-lg font-semibold">Drop PDF(s) / Images here</p>
-            <p class="text-slate-300 text-sm mt-1">or</p>
-            <label class="inline-flex mt-4 cursor-pointer items-center justify-center rounded-xl bg-indigo-500 hover:bg-indigo-400 px-5 py-2 font-semibold">
-              Select files
-              <input id="fileInput" type="file" multiple class="hidden">
-            </label>
-            <p class="text-xs text-slate-400 mt-3">Works best in Chrome/Edge.</p>
+        <div class="tabs" role="tablist" aria-label="Tool tabs">
+          <button id="tabPdf" class="tab active" role="tab" aria-selected="true">PDF</button>
+          <button id="tabImg" class="tab" role="tab" aria-selected="false">Image</button>
+        </div>
+      </div>
+
+      <section class="dropzone" id="dropzone">
+        <div class="dz-inner">
+          <div class="dz-title">Drop files here</div>
+          <div class="dz-sub">or</div>
+
+          <div class="dz-actions">
+            <input id="filePicker" type="file" hidden multiple />
+            <button class="btn primary" id="btnSelect">Select files</button>
+            <button class="btn" id="btnClear">Clear</button>
           </div>
 
-          <!-- Controls -->
-          <div class="mt-6 grid gap-5">
-            <div class="rounded-xl bg-black/20 border border-white/10 p-4">
-              <div class="flex items-center justify-between">
-                <p class="font-semibold">Selected files</p>
-                <span id="fileCount" class="text-xs px-2 py-1 rounded-lg bg-white/10">0</span>
-              </div>
-              <ul id="fileList" class="mt-3 grid gap-2 text-sm"></ul>
-            </div>
-
-            <!-- Panels -->
-            <div id="panel-merge" class="panel">
-              <h3 class="font-semibold text-lg">Merge PDFs</h3>
-              <p class="text-slate-300 text-sm">Combine multiple PDFs into one.</p>
-              <button id="btnMerge" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Merge & Download
-              </button>
-            </div>
-
-            <div id="panel-extract" class="panel hidden">
-              <h3 class="font-semibold text-lg">Extract pages (one PDF)</h3>
-              <p class="text-slate-300 text-sm">Example: 1-3,5,9-10 • all • odd • even</p>
-              <input id="rangeExtract" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none" placeholder="Enter range">
-              <button id="btnExtract" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Extract & Download
-              </button>
-            </div>
-
-            <div id="panel-split" class="panel hidden">
-              <h3 class="font-semibold text-lg">Split pages (ZIP)</h3>
-              <p class="text-slate-300 text-sm">Downloads each page as a PDF inside one ZIP.</p>
-              <input id="rangeSplit" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none" placeholder="Enter range (or all)">
-              <button id="btnSplitZip" class="mt-4 w-full md:w-auto rounded-xl bg-indigo-500 hover:bg-indigo-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Split to ZIP
-              </button>
-            </div>
-
-            <div id="panel-delete" class="panel hidden">
-              <h3 class="font-semibold text-lg">Delete pages</h3>
-              <p class="text-slate-300 text-sm">Removes the pages you specify and downloads updated PDF.</p>
-              <input id="rangeDelete" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none" placeholder="Enter pages to delete (e.g. 2,4-6)">
-              <button id="btnDelete" class="mt-4 w-full md:w-auto rounded-xl bg-rose-500 hover:bg-rose-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Delete & Download
-              </button>
-            </div>
-
-            <div id="panel-rotate" class="panel hidden">
-              <h3 class="font-semibold text-lg">Rotate pages</h3>
-              <p class="text-slate-300 text-sm">Rotate all pages OR only specified pages.</p>
-              <input id="rangeRotate" class="mt-3 w-full rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none" placeholder="Optional range (blank = all)">
-              <select id="rotateDeg" class="mt-3 w-full md:w-64 rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none">
-                <option value="90">90°</option>
-                <option value="180">180°</option>
-                <option value="270">270°</option>
-              </select>
-              <button id="btnRotate" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Rotate & Download
-              </button>
-            </div>
-
-            <div id="panel-img2pdf" class="panel hidden">
-              <h3 class="font-semibold text-lg">Images → PDF</h3>
-              <p class="text-slate-300 text-sm">Converts selected images into a single PDF (A4 pages).</p>
-              <button id="btnImgToPdf" class="mt-4 w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Create PDF
-              </button>
-            </div>
-
-            <div id="panel-imgconvert" class="panel hidden">
-              <h3 class="font-semibold text-lg">Image Convert (ZIP)</h3>
-              <p class="text-slate-300 text-sm">Convert images to PNG/JPG/WEBP and download as ZIP.</p>
-              <select id="imgFormat" class="mt-3 w-full md:w-64 rounded-xl bg-black/20 border border-white/10 px-4 py-2 outline-none">
-                <option value="image/png">PNG</option>
-                <option value="image/jpeg">JPG</option>
-                <option value="image/webp">WEBP</option>
-              </select>
-              <label class="block mt-3 text-xs text-slate-300">Quality (JPG/WEBP only)</label>
-              <input id="imgQuality" type="range" min="40" max="95" value="90" class="w-full">
-              <button id="btnImgConvertZip" class="mt-4 w-full md:w-auto rounded-xl bg-indigo-500 hover:bg-indigo-400 px-5 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                Convert & Download ZIP
-              </button>
-            </div>
-
-            <!-- Status -->
-            <div class="rounded-xl bg-black/20 border border-white/10 p-4">
-              <div class="flex items-center justify-between">
-                <p class="font-semibold">Status</p>
-                <span id="badge" class="text-xs px-2 py-1 rounded-lg bg-white/10">Idle</span>
-              </div>
-              <div class="mt-3 flex items-center gap-3">
-                <div id="spinner" class="hidden h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
-                <p id="status" class="text-slate-300 text-sm">Upload files to begin.</p>
-              </div>
-            </div>
-
-            <!-- Toasts -->
-            <div id="toastWrap" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
-
+          <div class="dz-tip" id="dzTip">
+            Tip: PDFs for PDF tools • Images (JPG/PNG/WebP) for image tools
           </div>
         </div>
       </section>
 
-      <footer class="text-xs text-slate-400 text-center">
-        Hosted on Cloudflare Pages + GitHub. Uses pdf-lib + fflate in browser. [1](https://microsoft.sharepoint.com/teams/aitagentbuilders/SitePages/AI%20Toolkit%20-%20Build%20Your%20own%20agents.aspx?web=1)[4](https://sentry.io/answers/how-do-i-resolve-cannot-find-module-error-using-node-js/)[5](https://github.com/elwerene/libreoffice-convert/issues/97)
-      </footer>
-    </main>
-  </div>
+      <section class="selected">
+        <div class="selected-head">
+          <div class="selected-title">Selected files</div>
+          <div class="pill" id="fileCount">0</div>
+        </div>
+        <div id="fileList" class="filelist"></div>
+      </section>
+
+      <!-- PDF tools -->
+      <section id="pdfTools" class="grid">
+        <article class="card">
+          <div class="card-title">Merge PDFs</div>
+          <div class="card-sub">Combine multiple PDFs into one.</div>
+          <button class="btn success full" id="btnMerge">Merge & Download</button>
+        </article>
+
+        <article class="card">
+          <div class="card-title">Split / Extract pages</div>
+          <div class="card-sub">Example: 1-3,5,9-10</div>
+          <input class="input" id="pageRanges" placeholder="Page ranges e.g. 1-3,5" />
+          <div class="row">
+            <button class="btn success full" id="btnExtract">Extract as PDF</button>
+            <button class="btn danger full" id="btnDeletePages">Delete pages</button>
+          </div>
+        </article>
+
+        <article class="card wide">
+          <div class="card-title">Rotate pages</div>
+          <div class="card-sub">Rotate all pages by 90/180/270 degrees.</div>
+          <div class="row">
+            <select class="select" id="rotateDeg">
+              <option value="90">90°</option>
+              <option value="180">180°</option>
+              <option value="270">270°</option>
+            </select>
+            <button class="btn success" id="btnRotate">Rotate & Download</button>
+          </div>
+        </article>
+      </section>
+
+      <!-- Image tools -->
+      <section id="imgTools" class="grid hidden">
+        <article class="card">
+          <div class="card-title">Convert format</div>
+          <div class="card-sub">Convert images to JPG / PNG / WebP</div>
+          <div class="row">
+            <select class="select" id="imgFormat">
+              <option value="image/jpeg">JPG</option>
+              <option value="image/png">PNG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+            <input class="input" id="imgQuality" type="number" min="1" max="100" value="85" />
+          </div>
+          <button class="btn success full" id="btnImgConvert">Convert & Download</button>
+        </article>
+
+        <article class="card">
+          <div class="card-title">Resize</div>
+          <div class="card-sub">Set width/height (keep aspect optional)</div>
+          <div class="row">
+            <input class="input" id="imgW" type="number" placeholder="Width" />
+            <input class="input" id="imgH" type="number" placeholder="Height" />
+          </div>
+          <label class="check">
+            <input type="checkbox" id="keepAspect" checked />
+            <span>Keep aspect ratio</span>
+          </label>
+          <button class="btn success full" id="btnImgResize">Resize & Download</button>
+        </article>
+
+        <article class="card wide">
+          <div class="card-title">Compress</div>
+          <div class="card-sub">Best for JPG/WebP. Uses quality slider.</div>
+          <button class="btn success" id="btnImgCompress">Compress & Download</button>
+        </article>
+      </section>
+
+      <section class="status">
+        <div>
+          <div class="status-title">Status</div>
+          <div class="status-sub" id="statusText">Drop files to begin.</div>
+        </div>
+        <div class="pill" id="statusPill">Idle</div>
+      </section>
+    </section>
+  </main>
 </body>
 </html>
