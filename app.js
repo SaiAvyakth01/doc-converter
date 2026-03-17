@@ -1,394 +1,487 @@
-// app.js — ConvertHub (browser-only conversions)
-// Requires pdf-lib + fflate loaded from index.html [4](https://sentry.io/answers/how-do-i-resolve-cannot-find-module-error-using-node-js/)[5](https://github.com/elwerene/libreoffice-convert/issues/97)
+/* ConvertHub — browser-only converter
+   PDF tools: pdf-lib (merge/extract/delete/rotate)
+   Image tools: Canvas (convert/resize/compress)
+*/
 
-(() => {
-  const $ = (id) => document.getElementById(id);
+const $ = (q) => document.querySelector(q);
 
-  // Elements
-  const dz = $("dropzone");
-  const input = $("fileInput");
-  const fileList = $("fileList");
-  const fileCount = $("fileCount");
-  const statusEl = $("status");
-  const badge = $("badge");
-  const spinner = $("spinner");
-  const toastWrap = $("toastWrap");
+const state = {
+  mode: "pdf",      // "pdf" | "img"
+  files: [],        // { file, id }
+};
 
-  // Buttons
-  const btnMerge = $("btnMerge");
-  const btnExtract = $("btnExtract");
-  const btnSplitZip = $("btnSplitZip");
-  const btnDelete = $("btnDelete");
-  const btnRotate = $("btnRotate");
-  const btnImgToPdf = $("btnImgToPdf");
-  const btnImgConvertZip = $("btnImgConvertZip");
+const els = {
+  tabPdf: $("#tabPdf"),
+  tabImg: $("#tabImg"),
+  pdfTools: $("#pdfTools"),
+  imgTools: $("#imgTools"),
 
-  // Inputs
-  const rangeExtract = $("rangeExtract");
-  const rangeSplit = $("rangeSplit");
-  const rangeDelete = $("rangeDelete");
-  const rangeRotate = $("rangeRotate");
-  const rotateDeg = $("rotateDeg");
-  const imgFormat = $("imgFormat");
-  const imgQuality = $("imgQuality");
+  dropzone: $("#dropzone"),
+  filePicker: $("#filePicker"),
+  btnSelect: $("#btnSelect"),
+  btnClear: $("#btnClear"),
+  fileList: $("#fileList"),
+  fileCount: $("#fileCount"),
 
-  // Tabs/panels
-  const tabs = document.querySelectorAll(".tooltab");
-  const panels = ["merge","extract","split","delete","rotate","img2pdf","imgconvert"]
-    .reduce((acc, t) => (acc[t] = $(`panel-${t}`), acc), {});
+  statusText: $("#statusText"),
+  statusPill: $("#statusPill"),
 
-  // Libraries
-  const { PDFDocument, degrees } = window.PDFLib;
-  const { zipSync } = window.fflate;
+  // PDF
+  btnMerge: $("#btnMerge"),
+  pageRanges: $("#pageRanges"),
+  btnExtract: $("#btnExtract"),
+  btnDeletePages: $("#btnDeletePages"),
+  rotateDeg: $("#rotateDeg"),
+  btnRotate: $("#btnRotate"),
 
-  // State
-  let files = [];
+  // IMG
+  imgFormat: $("#imgFormat"),
+  imgQuality: $("#imgQuality"),
+  imgW: $("#imgW"),
+  imgH: $("#imgH"),
+  keepAspect: $("#keepAspect"),
+  btnImgConvert: $("#btnImgConvert"),
+  btnImgResize: $("#btnImgResize"),
+  btnImgCompress: $("#btnImgCompress"),
+};
 
-  // ---------- UI helpers ----------
-  function toast(msg, type="info") {
-    const colors = {
-      info: "bg-white/10 border-white/20",
-      success: "bg-emerald-500/20 border-emerald-400/30",
-      error: "bg-rose-500/20 border-rose-400/30",
-    };
-    const el = document.createElement("div");
-    el.className = `rounded-xl border ${colors[type]} px-4 py-3 text-sm shadow-lg backdrop-blur`;
-    el.textContent = msg;
-    toastWrap.appendChild(el);
-    setTimeout(() => el.classList.add("opacity-0"), 2200);
-    setTimeout(() => el.remove(), 2600);
+init();
+registerSW();
+
+// ---------------- INIT ----------------
+function init() {
+  els.tabPdf.addEventListener("click", () => switchMode("pdf"));
+  els.tabImg.addEventListener("click", () => switchMode("img"));
+
+  els.btnSelect.addEventListener("click", () => {
+    els.filePicker.accept = state.mode === "pdf" ? "application/pdf" : "image/*";
+    els.filePicker.click();
+  });
+
+  els.filePicker.addEventListener("change", (e) => {
+    addFiles([...e.target.files]);
+    els.filePicker.value = "";
+  });
+
+  els.btnClear.addEventListener("click", clearFiles);
+
+  // Dropzone events
+  ["dragenter", "dragover"].forEach(evt =>
+    els.dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      els.dropzone.classList.add("drag");
+    })
+  );
+  ["dragleave", "drop"].forEach(evt =>
+    els.dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      els.dropzone.classList.remove("drag");
+    })
+  );
+  els.dropzone.addEventListener("drop", (e) => {
+    addFiles([...e.dataTransfer.files]);
+  });
+
+  // PDF handlers
+  els.btnMerge.addEventListener("click", onMerge);
+  els.btnExtract.addEventListener("click", onExtract);
+  els.btnDeletePages.addEventListener("click", onDeletePages);
+  els.btnRotate.addEventListener("click", onRotate);
+
+  // Image handlers
+  els.btnImgConvert.addEventListener("click", onImgConvert);
+  els.btnImgResize.addEventListener("click", onImgResize);
+  els.btnImgCompress.addEventListener("click", onImgCompress);
+
+  // aspect lock
+  els.imgW.addEventListener("input", syncAspectFromW);
+  els.imgH.addEventListener("input", syncAspectFromH);
+
+  render();
+  setStatus("Idle", "Drop files to begin.");
+}
+
+function switchMode(mode) {
+  state.mode = mode;
+  state.files = [];
+  render();
+
+  const isPdf = mode === "pdf";
+  els.tabPdf.classList.toggle("active", isPdf);
+  els.tabImg.classList.toggle("active", !isPdf);
+
+  els.pdfTools.classList.toggle("hidden", !isPdf);
+  els.imgTools.classList.toggle("hidden", isPdf);
+
+  setStatus("Idle", isPdf ? "PDF mode: add PDF files." : "Image mode: add images.");
+}
+
+function addFiles(files) {
+  const filtered = files.filter(f => {
+    if (state.mode === "pdf") return f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    return f.type.startsWith("image/");
+  });
+
+  if (!filtered.length) {
+    setStatus("Error", `No valid ${state.mode === "pdf" ? "PDF" : "image"} files detected.`);
+    return;
   }
 
-  function setBusy(text) {
-    spinner.classList.remove("hidden");
-    badge.textContent = "Working";
-    statusEl.textContent = text;
-  }
-  function setIdle(text="Upload files to begin.") {
-    spinner.classList.add("hidden");
-    badge.textContent = "Idle";
-    statusEl.textContent = text;
-  }
-  function setReady(text) {
-    spinner.classList.add("hidden");
-    badge.textContent = "Ready";
-    statusEl.textContent = text;
-  }
+  filtered.forEach(file => {
+    state.files.push({ file, id: crypto.randomUUID() });
+  });
 
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  render();
+  setStatus("Ready", `${state.files.length} file(s) selected.`);
+}
+
+function clearFiles() {
+  state.files = [];
+  render();
+  setStatus("Idle", "Cleared. Drop files to begin.");
+}
+
+function removeFile(id) {
+  state.files = state.files.filter(x => x.id !== id);
+  render();
+  setStatus("Ready", `${state.files.length} file(s) selected.`);
+}
+
+function render() {
+  els.fileCount.textContent = String(state.files.length);
+  els.fileList.innerHTML = "";
+
+  state.files.forEach(({ file, id }) => {
+    const div = document.createElement("div");
+    div.className = "fileitem";
+    div.innerHTML = `
+      <div class="filemeta">
+        <div class="filename">${escapeHtml(file.name)}</div>
+        <div class="filesub">${prettySize(file.size)} • ${file.type || "unknown"}</div>
+      </div>
+      <button class="xbtn" title="Remove">✕</button>
+    `;
+    div.querySelector(".xbtn").addEventListener("click", () => removeFile(id));
+    els.fileList.appendChild(div);
+  });
+}
+
+// ---------------- STATUS ----------------
+function setStatus(pill, text) {
+  els.statusPill.textContent = pill;
+  els.statusText.textContent = text;
+}
+
+// ---------------- PDF TOOLS ----------------
+function requirePdfFiles(min = 1) {
+  if (state.mode !== "pdf") throw new Error("Switch to PDF mode first.");
+  if (state.files.length < min) throw new Error(`Please select at least ${min} PDF file(s).`);
+}
+
+async function onMerge() {
+  try {
+    requirePdfFiles(2);
+    setStatus("Working", "Merging PDFs…");
+
+    const { PDFDocument } = window.PDFLib;
+    const merged = await PDFDocument.create();
+
+    for (const { file } of state.files) {
+      const bytes = await file.arrayBuffer();
+      const doc = await PDFDocument.load(bytes);
+      const copied = await merged.copyPages(doc, doc.getPageIndices());
+      copied.forEach(p => merged.addPage(p));
+    }
+
+    const outBytes = await merged.save();
+    downloadBytes(outBytes, "merged.pdf", "application/pdf");
+    setStatus("Done", "Merged PDF downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
   }
+}
 
-  function downloadPdfBytes(u8, name) {
-    downloadBlob(new Blob([u8], { type: "application/pdf" }), name);
+async function onExtract() {
+  try {
+    requirePdfFiles(1);
+    const ranges = els.pageRanges.value.trim();
+    if (!ranges) throw new Error("Enter page ranges first (e.g., 1-3,5,9-10).");
+
+    setStatus("Working", "Extracting pages…");
+    const { PDFDocument } = window.PDFLib;
+
+    const bytes = await state.files[0].file.arrayBuffer();
+    const src = await PDFDocument.load(bytes);
+
+    const indices = parseRangesToIndices(ranges, src.getPageCount());
+    if (!indices.length) throw new Error("No valid pages found from your ranges.");
+
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(src, indices);
+    pages.forEach(p => out.addPage(p));
+
+    const outBytes = await out.save();
+    downloadBytes(outBytes, "extracted-pages.pdf", "application/pdf");
+    setStatus("Done", "Extracted PDF downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
   }
+}
 
-  function downloadZip(fileMap, zipName) {
-    const zipped = zipSync(fileMap, { level: 6 });
-    downloadBlob(new Blob([zipped], { type: "application/zip" }), zipName);
+async function onDeletePages() {
+  try {
+    requirePdfFiles(1);
+    const ranges = els.pageRanges.value.trim();
+    if (!ranges) throw new Error("Enter page ranges to delete (e.g., 1-2,6).");
+
+    setStatus("Working", "Deleting pages…");
+    const { PDFDocument } = window.PDFLib;
+
+    const bytes = await state.files[0].file.arrayBuffer();
+    const doc = await PDFDocument.load(bytes);
+
+    const total = doc.getPageCount();
+    const del = new Set(parseRangesToIndices(ranges, total));
+    if (!del.size) throw new Error("No valid pages found from your ranges.");
+
+    // remove from end to start to keep indices valid
+    const toRemove = [...del].sort((a,b)=>b-a);
+    toRemove.forEach(i => doc.removePage(i));
+
+    const outBytes = await doc.save();
+    downloadBytes(outBytes, "deleted-pages.pdf", "application/pdf");
+    setStatus("Done", "Updated PDF downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
   }
+}
 
-  const isPdf = (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-  const isImg = (f) => /^image\//.test(f.type) || /\.(png|jpg|jpeg|webp)$/i.test(f.name);
+async function onRotate() {
+  try {
+    requirePdfFiles(1);
+    const deg = Number(els.rotateDeg.value);
 
-  function renderFiles() {
-    fileList.innerHTML = "";
-    fileCount.textContent = String(files.length);
+    setStatus("Working", `Rotating all pages by ${deg}°…`);
+    const { PDFDocument, degrees } = window.PDFLib;
 
-    files.forEach((f, idx) => {
-      const li = document.createElement("li");
-      li.className = "flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/10 px-3 py-2";
-      li.innerHTML = `
-        <div class="min-w-0">
-          <p class="truncate font-semibold">${f.name}</p>
-          <p class="text-xs text-slate-400">${Math.round(f.size/1024)} KB</p>
-        </div>
-        <button class="text-xs rounded-lg bg-white/10 hover:bg-white/15 px-3 py-1">Remove</button>
-      `;
-      li.querySelector("button").addEventListener("click", () => {
-        files.splice(idx, 1);
-        renderFiles();
-        refreshButtons();
-      });
-      fileList.appendChild(li);
+    const bytes = await state.files[0].file.arrayBuffer();
+    const doc = await PDFDocument.load(bytes);
+
+    doc.getPages().forEach(p => p.setRotation(degrees(deg)));
+
+    const outBytes = await doc.save();
+    downloadBytes(outBytes, `rotated-${deg}.pdf`, "application/pdf");
+    setStatus("Done", "Rotated PDF downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
+  }
+}
+
+// Convert ranges like "1-3,5,9-10" => [0,1,2,4,8,9]
+function parseRangesToIndices(input, pageCount) {
+  const cleaned = input.replace(/\s+/g, "");
+  const parts = cleaned.split(",").filter(Boolean);
+  const indices = [];
+
+  for (const part of parts) {
+    if (/^\d+$/.test(part)) {
+      const n = Number(part);
+      if (n >= 1 && n <= pageCount) indices.push(n - 1);
+      continue;
+    }
+    if (/^\d+-\d+$/.test(part)) {
+      let [a, b] = part.split("-").map(Number);
+      if (a > b) [a, b] = [b, a];
+      a = Math.max(1, a);
+      b = Math.min(pageCount, b);
+      for (let i = a; i <= b; i++) indices.push(i - 1);
+      continue;
+    }
+  }
+  // unique + sorted
+  return [...new Set(indices)].sort((x, y) => x - y);
+}
+
+// ---------------- IMAGE TOOLS ----------------
+function requireImgFiles(min = 1) {
+  if (state.mode !== "img") throw new Error("Switch to Image mode first.");
+  if (state.files.length < min) throw new Error(`Please select at least ${min} image file(s).`);
+}
+
+async function onImgConvert() {
+  try {
+    requireImgFiles(1);
+    const mime = els.imgFormat.value;
+    const q = clamp(Number(els.imgQuality.value || 85) / 100, 0.01, 1);
+
+    setStatus("Working", "Converting images…");
+
+    for (const { file } of state.files) {
+      const outBlob = await canvasTransform(file, { mime, quality: q });
+      const ext = mime === "image/png" ? "png" : (mime === "image/webp" ? "webp" : "jpg");
+      downloadBlob(outBlob, `${baseName(file.name)}.${ext}`);
+    }
+
+    setStatus("Done", "Converted image(s) downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
+  }
+}
+
+async function onImgResize() {
+  try {
+    requireImgFiles(1);
+    const w = Number(els.imgW.value || 0);
+    const h = Number(els.imgH.value || 0);
+    if (!w && !h) throw new Error("Enter width or height.");
+
+    const mime = els.imgFormat.value;
+    const q = clamp(Number(els.imgQuality.value || 85) / 100, 0.01, 1);
+
+    setStatus("Working", "Resizing images…");
+
+    for (const { file } of state.files) {
+      const img = await fileToImage(file);
+      let targetW = w, targetH = h;
+
+      if (els.keepAspect.checked) {
+        const ratio = img.width / img.height;
+        if (targetW && !targetH) targetH = Math.round(targetW / ratio);
+        if (!targetW && targetH) targetW = Math.round(targetH * ratio);
+      }
+
+      const outBlob = await canvasTransform(file, { mime, quality: q, width: targetW, height: targetH });
+      const ext = mime === "image/png" ? "png" : (mime === "image/webp" ? "webp" : "jpg");
+      downloadBlob(outBlob, `${baseName(file.name)}-${targetW}x${targetH}.${ext}`);
+    }
+
+    setStatus("Done", "Resized image(s) downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
+  }
+}
+
+async function onImgCompress() {
+  try {
+    requireImgFiles(1);
+    const mime = els.imgFormat.value;
+    const q = clamp(Number(els.imgQuality.value || 85) / 100, 0.01, 1);
+
+    setStatus("Working", "Compressing images…");
+
+    for (const { file } of state.files) {
+      const outBlob = await canvasTransform(file, { mime, quality: q });
+      const ext = mime === "image/png" ? "png" : (mime === "image/webp" ? "webp" : "jpg");
+      downloadBlob(outBlob, `${baseName(file.name)}-compressed.${ext}`);
+    }
+
+    setStatus("Done", "Compressed image(s) downloaded.");
+  } catch (e) {
+    setStatus("Error", e.message || String(e));
+  }
+}
+
+async function canvasTransform(file, { mime, quality, width, height }) {
+  const img = await fileToImage(file);
+
+  const outW = width || img.width;
+  const outH = height || img.height;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = outW;
+  canvas.height = outH;
+
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, outW, outH);
+
+  return await new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), mime, quality);
+  });
+}
+
+async function fileToImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = "eager";
+    await new Promise((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error("Failed to decode image."));
+      img.src = url;
     });
-
-    refreshButtons();
+    return img;
+  } finally {
+    // Keep url alive until image is loaded; revoke later:
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+}
 
-  function refreshButtons() {
-    const pdfs = files.filter(isPdf);
-    const imgs = files.filter(isImg);
+function syncAspectFromW() {
+  if (!els.keepAspect.checked) return;
+  if (!state.files.length) return;
+  // Use first image as reference
+  const f = state.files[0].file;
+  if (!f.type.startsWith("image/")) return;
+  fileToImage(f).then(img => {
+    const w = Number(els.imgW.value || 0);
+    if (!w) return;
+    const h = Math.round(w * (img.height / img.width));
+    els.imgH.value = String(h);
+  }).catch(()=>{});
+}
+function syncAspectFromH() {
+  if (!els.keepAspect.checked) return;
+  if (!state.files.length) return;
+  const f = state.files[0].file;
+  if (!f.type.startsWith("image/")) return;
+  fileToImage(f).then(img => {
+    const h = Number(els.imgH.value || 0);
+    if (!h) return;
+    const w = Math.round(h * (img.width / img.height));
+    els.imgW.value = String(w);
+  }).catch(()=>{});
+}
 
-    btnMerge.disabled = !(pdfs.length >= 2);
-    btnExtract.disabled = !(pdfs.length === 1);
-    btnSplitZip.disabled = !(pdfs.length === 1);
-    btnDelete.disabled = !(pdfs.length === 1);
-    btnRotate.disabled = !(pdfs.length === 1);
-    btnImgToPdf.disabled = !(imgs.length >= 1);
-    btnImgConvertZip.disabled = !(imgs.length >= 1);
-  }
+// ---------------- DOWNLOAD HELPERS ----------------
+function downloadBytes(uint8, name, mime) {
+  const blob = new Blob([uint8], { type: mime });
+  downloadBlob(blob, name);
+}
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-  // Range parser: "1-3,5" + "all/odd/even"
-  function parseRanges(text, maxPages) {
-    const raw = (text || "").trim().toLowerCase();
-    if (!raw || raw === "all") return Array.from({ length: maxPages }, (_, i) => i + 1);
-    if (raw === "odd") return Array.from({ length: maxPages }, (_, i) => i + 1).filter(n => n % 2 === 1);
-    if (raw === "even") return Array.from({ length: maxPages }, (_, i) => i + 1).filter(n => n % 2 === 0);
+// ---------------- UTILS ----------------
+function prettySize(bytes) {
+  const u = ["B","KB","MB","GB"];
+  let i=0, n=bytes;
+  while (n >= 1024 && i < u.length-1) { n/=1024; i++; }
+  return `${n.toFixed(i===0?0:1)} ${u[i]}`;
+}
+function baseName(name) {
+  return name.replace(/\.[^.]+$/, "");
+}
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
-    const parts = raw.split(",").map(s => s.trim()).filter(Boolean);
-    const set = new Set();
-    for (const p of parts) {
-      if (p.includes("-")) {
-        const [a, b] = p.split("-").map(x => parseInt(x.trim(), 10));
-        if (Number.isFinite(a) && Number.isFinite(b)) {
-          for (let i = Math.min(a, b); i <= Math.max(a, b); i++) set.add(i);
-        }
-      } else {
-        const n = parseInt(p, 10);
-        if (Number.isFinite(n)) set.add(n);
-      }
-    }
-    return [...set].filter(n => n >= 1 && n <= maxPages).sort((x, y) => x - y);
-  }
-
-  async function loadPdf(file) {
-    const bytes = await file.arrayBuffer();
-    return PDFDocument.load(bytes);
-  }
-
-  // Convert any image (png/jpg/webp) to PNG bytes for reliable embedding
-  async function imageToPngBytes(file) {
-    const bmp = await createImageBitmap(file);
-    const canvas = document.createElement("canvas");
-    canvas.width = bmp.width;
-    canvas.height = bmp.height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bmp, 0, 0);
-    const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
-    return new Uint8Array(await blob.arrayBuffer());
-  }
-
-  async function convertImage(file, targetMime, q) {
-    const bmp = await createImageBitmap(file);
-    const canvas = document.createElement("canvas");
-    canvas.width = bmp.width;
-    canvas.height = bmp.height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bmp, 0, 0);
-    const quality = (targetMime === "image/jpeg" || targetMime === "image/webp")
-      ? Math.max(0.4, Math.min(0.95, q))
-      : undefined;
-    const blob = await new Promise(res => canvas.toBlob(res, targetMime, quality));
-    return new Uint8Array(await blob.arrayBuffer());
-  }
-
-  // ---------- Tabs ----------
-  function setTab(tab) {
-    tabs.forEach(b => {
-      const active = b.dataset.tab === tab;
-      b.className = active
-        ? "tooltab px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold"
-        : "tooltab px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100";
-    });
-    Object.keys(panels).forEach(k => panels[k].classList.toggle("hidden", k !== tab));
-  }
-
-  tabs.forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
-
-  // ---------- File input + drop ----------
-  input.addEventListener("change", (e) => {
-    const selected = [...e.target.files];
-    files = selected.filter(f => isPdf(f) || isImg(f));
-    renderFiles();
-    setReady(`${files.length} file(s) ready.`);
-    toast("Files added ✅", "success");
-  });
-
-  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("ring-2","ring-indigo-400/60"); });
-  dz.addEventListener("dragleave", () => dz.classList.remove("ring-2","ring-indigo-400/60"));
-  dz.addEventListener("drop", e => {
-    e.preventDefault();
-    dz.classList.remove("ring-2","ring-indigo-400/60");
-    files = [...e.dataTransfer.files].filter(f => isPdf(f) || isImg(f));
-    renderFiles();
-    setReady(`${files.length} file(s) ready.`);
-    toast("Files added ✅", "success");
-  });
-
-  // ---------- Actions ----------
-  btnMerge.addEventListener("click", async () => {
-    const pdfs = files.filter(isPdf);
-    if (pdfs.length < 2) return toast("Select 2+ PDFs", "error");
-
-    setBusy("Merging PDFs...");
+// ---------------- PWA/SW ----------------
+function registerSW() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", async () => {
     try {
-      const out = await PDFDocument.create();
-      for (const f of pdfs) {
-        const src = await loadPdf(f);
-        const copied = await out.copyPages(src, src.getPageIndices());
-        copied.forEach(p => out.addPage(p));
-      }
-      downloadPdfBytes(await out.save(), "merged.pdf");
-      toast("Merge complete ✅", "success");
-    } catch {
-      toast("Merge failed ❌", "error");
-    } finally {
-      setIdle();
-    }
+      await navigator.serviceWorker.register("./sw.js");
+    } catch (_) {}
   });
-
-  btnExtract.addEventListener("click", async () => {
-    const pdf = files.find(isPdf);
-    if (!pdf) return toast("Select 1 PDF", "error");
-
-    setBusy("Extracting pages...");
-    try {
-      const src = await loadPdf(pdf);
-      const wanted = parseRanges(rangeExtract.value, src.getPageCount());
-      const out = await PDFDocument.create();
-      const copied = await out.copyPages(src, wanted.map(n => n - 1));
-      copied.forEach(p => out.addPage(p));
-      downloadPdfBytes(await out.save(), "extracted.pdf");
-      toast("Extract complete ✅", "success");
-    } catch {
-      toast("Extract failed ❌", "error");
-    } finally {
-      setIdle();
-    }
-  });
-
-  btnSplitZip.addEventListener("click", async () => {
-    const pdf = files.find(isPdf);
-    if (!pdf) return toast("Select 1 PDF", "error");
-
-    setBusy("Splitting to ZIP...");
-    try {
-      const src = await loadPdf(pdf);
-      const wanted = parseRanges(rangeSplit.value, src.getPageCount());
-      const zipMap = {};
-      for (const pg of wanted) {
-        const sub = await PDFDocument.create();
-        const [copied] = await sub.copyPages(src, [pg - 1]);
-        sub.addPage(copied);
-        zipMap[`page-${pg}.pdf`] = await sub.save();
-      }
-      downloadZip(zipMap, "split-pages.zip");
-      toast("Split ZIP ready ✅", "success");
-    } catch {
-      toast("Split failed ❌", "error");
-    } finally {
-      setIdle();
-    }
-  });
-
-  btnDelete.addEventListener("click", async () => {
-    const pdf = files.find(isPdf);
-    if (!pdf) return toast("Select 1 PDF", "error");
-
-    setBusy("Deleting pages...");
-    try {
-      const src = await loadPdf(pdf);
-      const del = parseRanges(rangeDelete.value, src.getPageCount()).sort((a,b)=>b-a);
-      del.forEach(p => src.removePage(p - 1)); // removePage supported by pdf-lib
-      downloadPdfBytes(await src.save(), "deleted-pages.pdf");
-      toast("Delete complete ✅", "success");
-    } catch {
-      toast("Delete failed ❌", "error");
-    } finally {
-      setIdle();
-    }
-  });
-
-  btnRotate.addEventListener("click", async () => {
-    const pdf = files.find(isPdf);
-    if (!pdf) return toast("Select 1 PDF", "error");
-
-    setBusy("Rotating pages...");
-    try {
-      const src = await loadPdf(pdf);
-      const deg = parseInt(rotateDeg.value, 10);
-      const wanted = parseRanges(rangeRotate.value, src.getPageCount());
-      const wantedSet = new Set(wanted.map(n => n - 1));
-
-      src.getPages().forEach((p, idx) => {
-        if (wantedSet.size === 0 || wantedSet.has(idx)) p.setRotation(degrees(deg));
-      });
-
-      downloadPdfBytes(await src.save(), `rotated-${deg}.pdf`);
-      toast("Rotate complete ✅", "success");
-    } catch {
-      toast("Rotate failed ❌", "error");
-    } finally {
-      setIdle();
-    }
-  });
-
-  btnImgToPdf.addEventListener("click", async () => {
-    const imgs = files.filter(isImg);
-    if (!imgs.length) return toast("Select 1+ images", "error");
-
-    setBusy("Creating PDF from images...");
-    try {
-      const pdf = await PDFDocument.create();
-      const A4_W = 595, A4_H = 842;
-
-      for (const imgFile of imgs) {
-        const pngBytes = await imageToPngBytes(imgFile);
-        const img = await pdf.embedPng(pngBytes);
-
-        const page = pdf.addPage([A4_W, A4_H]);
-        const margin = 24;
-        const maxW = A4_W - margin*2;
-        const maxH = A4_H - margin*2;
-        const scale = Math.min(maxW / img.width, maxH / img.height);
-        const w = img.width * scale;
-        const h = img.height * scale;
-
-        page.drawImage(img, { x:(A4_W-w)/2, y:(A4_H-h)/2, width:w, height:h });
-      }
-
-      downloadPdfBytes(await pdf.save(), "images.pdf");
-      toast("Images → PDF ✅", "success");
-    } catch {
-      toast("Images → PDF failed ❌", "error");
-    } finally {
-      setIdle();
-    }
-  });
-
-  btnImgConvertZip.addEventListener("click", async () => {
-    const imgs = files.filter(isImg);
-    if (!imgs.length) return toast("Select 1+ images", "error");
-
-    setBusy("Converting images...");
-    try {
-      const target = imgFormat.value;
-      const q = parseInt(imgQuality.value, 10) / 100;
-      const zipMap = {};
-      const ext = target === "image/png" ? "png" : (target === "image/webp" ? "webp" : "jpg");
-
-      for (const f of imgs) {
-        const bytes = await convertImage(f, target, q);
-        zipMap[`${f.name.replace(/\.[^.]+$/,"")}.${ext}`] = bytes;
-      }
-
-      downloadZip(zipMap, "converted-images.zip");
-      toast("Image ZIP ✅", "success");
-    } catch {
-      toast("Image convert failed ❌", "error");
-    } finally {
-      setIdle();
-    }
-  });
-
-  // Init
-  setTab("merge");
-  renderFiles();
-  setIdle();
-})();
+}
