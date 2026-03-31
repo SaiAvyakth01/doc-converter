@@ -1,109 +1,131 @@
 export async function onRequestPost({ request, env }) {
   try {
-    // 1. Read form data
+    const apiKey = env.CLOUDCONVERT_API_KEY;
+    if (!apiKey || apiKey.length < 10) {
+      return new Response(
+        "Server misconfigured: CLOUDCONVERT_API_KEY missing. Check /api/ping",
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
-    const toFormat = formData.get("to");
+    const toFormat = (formData.get("to") || "").toString().toLowerCase();
 
     if (!file || !toFormat) {
-      return new Response("File or format missing", { status: 400 });
+      return new Response("Missing file or target format", { status: 400 });
     }
 
-    // 2. Detect input format from filename (IMPORTANT FIX)
-    const inputFormat = file.name.split(".").pop().toLowerCase();
+    const inputFormat = (file.name.split(".").pop() || "").toLowerCase();
 
-    // Optional safety check (recommended)
-    const supportedFormats = ["pdf", "docx", "doc"];
-    if (!supportedFormats.includes(inputFormat) || !supportedFormats.includes(toFormat)) {
-      return new Response("Unsupported file format", { status: 400 });
+    // Allow more formats so it "just works"
+    const allowed = new Set([
+      "pdf","doc","docx","rtf","txt",
+      "ppt","pptx","xls","xlsx",
+      "png","jpg","jpeg","webp"
+    ]);
+
+    if (!allowed.has(inputFormat) || !allowed.has(toFormat)) {
+      return new Response(
+        `Unsupported file format. Input=${inputFormat || "unknown"} Output=${toFormat}`,
+        { status: 400 }
+      );
     }
 
-    // 3. CREATE CONVERSION JOB (this is the "job creation section")
-    const jobResponse = await fetch("https://api.cloudconvert.com/v2/jobs", {
+    // Create job (import/upload -> convert -> export/url)
+    const jobRes = await fetch("https://api.cloudconvert.com/v2/jobs", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${env.CLOUDCONVERT_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         tasks: {
-          "import-file": {
-            operation: "import/upload"
-          },
+          "import-file": { operation: "import/upload" },
           "convert-file": {
             operation: "convert",
             input: "import-file",
             input_format: inputFormat,
             output_format: toFormat
           },
-          "export-file": {
-            operation: "export/url",
-            input: "convert-file"
-          }
+          "export-file": { operation: "export/url", input: "convert-file" }
         }
       })
     });
 
-    if (!jobResponse.ok) {
-      const err = await jobResponse.text();
-      return new Response("Job creation failed: " + err, { status: 500 });
+    if (!jobRes.ok) {
+      const errText = await jobRes.text();
+      return new Response(
+        `Job creation failed (${jobRes.status}): ${errText}`,
+        { status: 500 }
+      );
     }
 
-    const jobData = await jobResponse.json();
+    const job = await jobRes.json();
+    const importTask = job?.data?.tasks?.find(t => t.name === "import-file");
+    const uploadUrl = importTask?.result?.form?.url;
+    const uploadParams = importTask?.result?.form?.parameters;
 
-    // 4. Upload file to CloudConvert
-    const importTask = jobData.data.tasks.find(t => t.name === "import-file");
-    const uploadUrl = importTask.result.form.url;
-    const uploadParams = importTask.result.form.parameters;
+    if (!uploadUrl || !uploadParams) {
+      return new Response("Upload form missing from CloudConvert response", { status: 500 });
+    }
 
+    // Upload file
     const uploadForm = new FormData();
-    Object.entries(uploadParams).forEach(([key, value]) => {
-      uploadForm.append(key, value);
-    });
-    uploadForm.append("file", file, file.name);
+    for (const [k, v] of Object.entries(uploadParams)) uploadForm.append(k, v);
+    uploadForm.append("file", file, file.name || "input");
 
-    await fetch(uploadUrl, {
-      method: "POST",
-      body: uploadForm
-    });
+    const upRes = await fetch(uploadUrl, { method: "POST", body: uploadForm });
+    if (!upRes.ok) {
+      const errText = await upRes.text();
+      return new Response(`Upload failed (${upRes.status}): ${errText}`, { status: 500 });
+    }
 
-    // 5. Poll until job finishes
-    let finalJob;
+    // Poll job
+    const jobId = job.data.id;
+    let finalJob = null;
+
     for (let i = 0; i < 60; i++) {
-      const pollRes = await fetch(
-        `https://api.cloudconvert.com/v2/jobs/${jobData.data.id}`,
-        {
-          headers: {
-            "Authorization": `Bearer ${env.CLOUDCONVERT_API_KEY}`
-          }
-        }
-      );
+      const pollRes = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
 
-      finalJob = await pollRes.json();
-      if (finalJob.data.status === "finished") break;
-
-      if (finalJob.data.status === "error") {
-        return new Response("Conversion failed on server", { status: 500 });
+      if (!pollRes.ok) {
+        const errText = await pollRes.text();
+        return new Response(`Polling failed (${pollRes.status}): ${errText}`, { status: 500 });
       }
 
+      const poll = await pollRes.json();
+      if (poll.data.status === "finished") { finalJob = poll; break; }
+      if (poll.data.status === "error") {
+        return new Response("Conversion failed (CloudConvert job error)", { status: 500 });
+      }
       await new Promise(r => setTimeout(r, 1000));
     }
 
-    // 6. Download converted file
+    if (!finalJob) {
+      return new Response("Timed out waiting for conversion", { status: 504 });
+    }
+
     const exportTask = finalJob.data.tasks.find(t => t.name === "export-file");
-    const outputFile = exportTask.result.files[0];
+    const out = exportTask?.result?.files?.[0];
+    if (!out?.url) return new Response("No output file returned", { status: 500 });
 
-    const fileResponse = await fetch(outputFile.url);
+    const outRes = await fetch(out.url);
+    if (!outRes.ok) {
+      const errText = await outRes.text();
+      return new Response(`Output download failed (${outRes.status}): ${errText}`, { status: 500 });
+    }
 
-    return new Response(fileResponse.body, {
+    return new Response(outRes.body, {
       headers: {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${outputFile.filename}"`,
+        "Content-Type": outRes.headers.get("Content-Type") || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${out.filename || `converted.${toFormat}`}"`,
         "Cache-Control": "no-store"
       }
     });
 
-  } catch (err) {
-    return new Response("Unexpected server error: " + err.message, { status: 500 });
+  } catch (e) {
+    return new Response(`Server error: ${e.message}`, { status: 500 });
   }
 }
