@@ -1,13 +1,122 @@
-.panel{
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.01));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:18px;
-  box-shadow:
-    0 20px 60px rgba(0,0,0,.45),
-    inset 0 1px 0 rgba(255,255,255,.06);
-  padding:18px;
+/* Reset */
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
-``
+
+/* Background */
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #6a11cb, #2575fc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Main container */
+.container {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+}
+
+/* Card */
+.card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 30px 26px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  animation: fadeIn 0.6s ease;
+}
+
+/* Heading */
+.card h1 {
+  margin: 0;
+  text-align: center;
+  color: #2c2c2c;
+}
+
+/* Subtitle */
+.subtitle {
+  text-align: center;
+  color: #666;
+  font-size: 0.95rem;
+  margin-bottom: 25px;
+}
+
+/* Form */
+.form-group {
+  margin-bottom: 18px;
+}
+
+label {
+  display: block;
+  font-size: 0.9rem;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+input[type="file"],
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.95rem;
+}
+
+/* Button */
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: linear-gradient(135deg, #ff512f, #dd2476);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(221, 36, 118, 0.35);
+}
+
+/* Status */
+.status {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+/* Footer */
+footer {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #eaeaea;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .card {
+    padding: 24px 20px;
+  }
+}
