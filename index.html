@@ -1,45 +1,86 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Doc Converter</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 
 <body>
-  <div class="bg-gradient"></div>
+  <!-- Full-page background -->
+  <div class="bg"></div>
 
-  <main class="container">
-    <div class="card">
-      <h1>Doc Converter</h1>
-      <p class="subtitle">
-        Convert documents instantly using a fast, secure cloud engine.
-      </p>
+  <main class="wrap">
+    <section class="card">
+      <header class="header">
+        <div class="logo">DC</div>
+        <div>
+          <h1>Doc Converter</h1>
+          <p class="subtitle">Drag & drop. Convert. Download. Simple & clean.</p>
+        </div>
+      </header>
 
-      <div class="form-group">
-        <label>Select File</label>
-        <input type="file" id="fileInput" />
+      <!-- Drop zone -->
+      <div id="dropZone" class="drop">
+        <input id="fileInput" type="file" class="file" />
+        <div class="drop-inner">
+          <div class="drop-icon">⬇️</div>
+          <div class="drop-text">
+            <strong>Drop your file here</strong>
+            <span>or choose a file from your device</span>
+          </div>
+          <button type="button" id="browseBtn" class="ghost">Browse File</button>
+        </div>
+        <div id="fileMeta" class="filemeta hidden">
+          <div class="pill">
+            <span id="fileName">—</span>
+            <button type="button" id="removeFile" class="xbtn" aria-label="Remove file">✕</button>
+          </div>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label>Convert To</label>
-        <select id="toFormat">
-          <option value="pdf">PDF</option>
-          <option value="docx">DOCX</option>
-        </select>
+      <!-- Controls -->
+      <div class="controls">
+        <div class="control">
+          <label for="toFormat">Convert to</label>
+          <select id="toFormat">
+            <option value="pdf">PDF</option>
+            <option value="docx">DOCX</option>
+          </select>
+        </div>
+
+        <button id="convertBtn" class="cta" type="button">
+          <span class="cta-text">Convert Now</span>
+          <span class="cta-arrow">➜</span>
+        </button>
       </div>
 
-      <button id="convertBtn">Convert Now</button>
+      <!-- Status + progress -->
+      <div class="statusRow">
+        <p id="status" class="status">Ready 🚀</p>
+        <div id="progressWrap" class="progressWrap hidden">
+          <div class="progressBar" id="progressBar"></div>
+        </div>
+      </div>
 
-      <p id="status" class="status">Ready to convert 🚀</p>
-    </div>
-
-    <footer>
-      Built with ❤️ using Cloudflare & GitHub
-    </footer>
+      <footer class="footer">
+        Built on Cloudflare Pages + Functions (serverless API routes). 【1-142161】【2-9a3b2f】
+      </footer>
+    </section>
   </main>
+
+  <!-- Spinner overlay -->
+  <div id="overlay" class="overlay hidden" role="status" aria-live="polite">
+    <div class="spinnerCard">
+      <div class="spinner"></div>
+      <div class="spinnerText">
+        <strong>Converting…</strong>
+        <span>Please wait. Your download will start automatically.</span>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
