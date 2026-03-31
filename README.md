@@ -3,4 +3,4 @@ git clone https://github.com/vid-factory/convertagent.git
 cd convertagent
 npm install
 npm run build
-node dist/api/server.js
+node dist/api/server.js 
