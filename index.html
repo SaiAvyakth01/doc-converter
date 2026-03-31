@@ -1,146 +1,46 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ConvertHub — Browser Converter</title>
-
-  <link rel="stylesheet" href="./styles.css" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <meta name="theme-color" content="#0b1220" />
-
-  <!-- pdf-lib (UMD) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <script defer src="./app.js"></script>
+  <meta charset="UTF-8" />
+  <title>Doc Converter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="title">
-        <span class="t1">ConvertHub</span>
-        <span class="t2">— Browser Converter</span>
+  <div class="bg-gradient"></div>
+
+  <main class="container">
+    <div class="card">
+      <h1>Doc Converter</h1>
+      <p class="subtitle">
+        Convert documents instantly using a fast, secure cloud engine.
+      </p>
+
+      <div class="form-group">
+        <label>Select File</label>
+        <input type="file" id="fileInput" />
       </div>
-      <div class="subtitle">Fast • private • 100% in-browser • hosted on Cloudflare Pages</div>
+
+      <div class="form-group">
+        <label>Convert To</label>
+        <select id="toFormat">
+          <option value="pdf">PDF</option>
+          <option value="docx">DOCX</option>
+        </select>
+      </div>
+
+      <button id="convertBtn">Convert Now</button>
+
+      <p id="status" class="status">Ready to convert 🚀</p>
     </div>
-  </header>
 
-  <main class="wrap">
-    <section class="panel">
-      <div class="panel-head">
-        <div>
-          <div class="panel-title">Tools</div>
-          <div class="panel-sub">PDF + Image conversions (no uploads).</div>
-        </div>
-
-        <div class="tabs" role="tablist" aria-label="Tool tabs">
-          <button id="tabPdf" class="tab active" role="tab" aria-selected="true">PDF</button>
-          <button id="tabImg" class="tab" role="tab" aria-selected="false">Image</button>
-        </div>
-      </div>
-
-      <section class="dropzone" id="dropzone">
-        <div class="dz-inner">
-          <div class="dz-title">Drop files here</div>
-          <div class="dz-sub">or</div>
-
-          <div class="dz-actions">
-            <input id="filePicker" type="file" hidden multiple />
-            <button class="btn primary" id="btnSelect">Select files</button>
-            <button class="btn" id="btnClear">Clear</button>
-          </div>
-
-          <div class="dz-tip" id="dzTip">
-            Tip: PDFs for PDF tools • Images (JPG/PNG/WebP) for image tools
-          </div>
-        </div>
-      </section>
-
-      <section class="selected">
-        <div class="selected-head">
-          <div class="selected-title">Selected files</div>
-          <div class="pill" id="fileCount">0</div>
-        </div>
-        <div id="fileList" class="filelist"></div>
-      </section>
-
-      <!-- PDF tools -->
-      <section id="pdfTools" class="grid">
-        <article class="card">
-          <div class="card-title">Merge PDFs</div>
-          <div class="card-sub">Combine multiple PDFs into one.</div>
-          <button class="btn success full" id="btnMerge">Merge & Download</button>
-        </article>
-
-        <article class="card">
-          <div class="card-title">Split / Extract pages</div>
-          <div class="card-sub">Example: 1-3,5,9-10</div>
-          <input class="input" id="pageRanges" placeholder="Page ranges e.g. 1-3,5" />
-          <div class="row">
-            <button class="btn success full" id="btnExtract">Extract as PDF</button>
-            <button class="btn danger full" id="btnDeletePages">Delete pages</button>
-          </div>
-        </article>
-
-        <article class="card wide">
-          <div class="card-title">Rotate pages</div>
-          <div class="card-sub">Rotate all pages by 90/180/270 degrees.</div>
-          <div class="row">
-            <select class="select" id="rotateDeg">
-              <option value="90">90°</option>
-              <option value="180">180°</option>
-              <option value="270">270°</option>
-            </select>
-            <button class="btn success" id="btnRotate">Rotate & Download</button>
-          </div>
-        </article>
-      </section>
-
-      <!-- Image tools -->
-      <section id="imgTools" class="grid hidden">
-        <article class="card">
-          <div class="card-title">Convert format</div>
-          <div class="card-sub">Convert images to JPG / PNG / WebP</div>
-          <div class="row">
-            <select class="select" id="imgFormat">
-              <option value="image/jpeg">JPG</option>
-              <option value="image/png">PNG</option>
-              <option value="image/webp">WebP</option>
-            </select>
-            <input class="input" id="imgQuality" type="number" min="1" max="100" value="85" />
-          </div>
-          <button class="btn success full" id="btnImgConvert">Convert & Download</button>
-        </article>
-
-        <article class="card">
-          <div class="card-title">Resize</div>
-          <div class="card-sub">Set width/height (keep aspect optional)</div>
-          <div class="row">
-            <input class="input" id="imgW" type="number" placeholder="Width" />
-            <input class="input" id="imgH" type="number" placeholder="Height" />
-          </div>
-          <label class="check">
-            <input type="checkbox" id="keepAspect" checked />
-            <span>Keep aspect ratio</span>
-          </label>
-          <button class="btn success full" id="btnImgResize">Resize & Download</button>
-        </article>
-
-        <article class="card wide">
-          <div class="card-title">Compress</div>
-          <div class="card-sub">Best for JPG/WebP. Uses quality slider.</div>
-          <button class="btn success" id="btnImgCompress">Compress & Download</button>
-        </article>
-      </section>
-
-      <section class="status">
-        <div>
-          <div class="status-title">Status</div>
-          <div class="status-sub" id="statusText">Drop files to begin.</div>
-        </div>
-        <div class="pill" id="statusPill">Idle</div>
-      </section>
-    </section>
+    <footer>
+      Built with ❤️ using Cloudflare & GitHub
+    </footer>
   </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
