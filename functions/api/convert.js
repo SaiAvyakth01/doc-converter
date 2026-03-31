@@ -13,7 +13,7 @@ export async function onRequestPost({ request, env }) {
     const inputFormat = file.name.split(".").pop().toLowerCase();
 
     // Optional safety check (recommended)
-    const supportedFormats = ["pdf", "docx"];
+    const supportedFormats = ["pdf", "docx", "doc"];
     if (!supportedFormats.includes(inputFormat) || !supportedFormats.includes(toFormat)) {
       return new Response("Unsupported file format", { status: 400 });
     }
